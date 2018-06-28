@@ -1,9 +1,9 @@
-// LSB.cpp : Defines the entry point for the console application.
-//
+// LSB.c : Defines the entry point for the console application.
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <windows.h>
 #include <locale.h>
+#pragma pack(push, 1)//padding (1 byte)
 typedef struct BITMAPINFOHEADER
 {
 	DWORD biSize;  //specifies the number of bytes required by the struct
@@ -26,6 +26,35 @@ typedef struct BITMAPFILEHEADER
 	WORD bfReserved2;  //reserved; must be 0
 	DWORD bfOffBits;  //species the offset in bytes from the bitmapfileheader to the bitmap bits
 };
+#pragma pack(pop)//
+char *load_text_data(char *text_file_name) {
+	char *tmp, *R = NULL;
+	char ch;
+	int lenght = 0;
+	FILE *input_text = fopen(text_file_name, "r");
+	if (input_text != NULL) {
+		while (!feof(input_text)) {
+			ch = fgetc(input_text);
+			tmp = (char*)realloc(R, (lenght + 1)*(sizeof(int)));
+			if (tmp == NULL) {
+				printf("Error!Not enough memory\n");
+				free(R);
+				return NULL;
+			}
+			else {
+				R = tmp;
+				R[lenght] = ch;
+				lenght++;
+			}
+		}
+		fclose(input_text);
+		return R;
+	}
+	else {
+		printf("Can not open text file!\n");
+		return NULL;
+	}
+};
 unsigned char *load_image_data(BITMAPINFOHEADER *image_info_header,char *image_file_name) {
 		FILE *input_image; 
 		BITMAPFILEHEADER image_file_header; 
@@ -37,6 +66,12 @@ unsigned char *load_image_data(BITMAPINFOHEADER *image_info_header,char *image_f
 				return NULL;
 			}
 			fread(image_info_header, sizeof(BITMAPINFOHEADER), 1, input_image);
+			//Size of data is empty?(work with 24 bit)
+			if (image_info_header->biSizeImage == 0) {
+				image_info_header->biSizeImage = image_info_header->biWidth *sizeof(RGBTRIPLE)+ image_info_header->biWidth%4;
+				image_info_header->biSizeImage *=abs(image_info_header->biHeight);
+			}
+			/*Some code for another situation 8,16 bit*/
 			//move file point to the begging of bitmap data
 			fseek(input_image, image_file_header.bfOffBits, SEEK_SET);
 			image_data = (unsigned char*)malloc(image_info_header->biSizeImage);
@@ -46,7 +81,7 @@ unsigned char *load_image_data(BITMAPINFOHEADER *image_info_header,char *image_f
 				return NULL;
 			}
 			//read in the bitmap image data
-			fread(image_data, 1, (image_info_header->biSizeImage), input_image);
+			fread(image_data,1,(image_info_header->biSizeImage), input_image);
 			if (image_data == NULL){
 				fclose(input_image);
 				return NULL;
@@ -61,17 +96,23 @@ unsigned char *load_image_data(BITMAPINFOHEADER *image_info_header,char *image_f
 int encrypt(char *text_file_name, char *image_file_name) {
 	BITMAPINFOHEADER image_info_header;
 	unsigned char *image_data;
+	char *text_data;
 	image_data = load_image_data(&image_info_header,image_file_name);
-	printf("%d", image_info_header.biSizeImage);
-	//output the bitmap image data to the console
-	for (int i = 0; i < image_info_header.biSizeImage; i++) {
+	text_data = load_text_data(text_file_name);
+	/*output the bitmap image data to the console
+	for (int i = 0; i <image_info_header.biSizeImage; i++) {
 		printf("%c", image_data[i]);
-		if (i % 4 == 0) printf("\t");
-	}
+		if (i % 3 == 0) printf("\t");
+	}*/
+	/*output the text data to the console
+	for (int i = 0; i <strlen(text_data); i++) {
+	printf("%c", text_data[i]);
+	}*/
 	return 1;
 };
-int decrypt(char *text_file_name, char *image_file_name) {\
+int decrypt(char *text_file_name, char *image_file_name) {
 	printf("Test passed\n");
+	return 1;
 };
 int main(int argc,char **argv)
 {
@@ -105,4 +146,3 @@ int main(int argc,char **argv)
 	else printf("Error! Only 3 parameters are requirted!\n");
     return 0;
 }
-
