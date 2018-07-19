@@ -1,14 +1,14 @@
 // LSB.c : Defines the entry point for the console application.
+//
 #define _CRT_SECURE_NO_WARNINGS
 #define BMPIMAGENAME "OUTPUT_IMAGE_NAME.bmp"
 #define TXTTEXTNAME "OUTPUT_TEXT_NAME.txt"
-#define SETCOLORblack ""
+#define SETCOLORblack "0"
 #include <stdio.h>
 #include <windows.h>
 #include <locale.h>
 #pragma pack(push, 1)//padding (1 byte)
-typedef struct BITMAPINFOHEADER
-{
+typedef struct BITMAPINFOHEADER {
 	DWORD biSize;  //specifies the number of bytes required by the struct
 	LONG biWidth;  //specifies width in pixels
 	LONG biHeight;  //species height in pixels
@@ -21,8 +21,7 @@ typedef struct BITMAPINFOHEADER
 	DWORD biClrUsed;  //number of colors used by th ebitmap
 	DWORD biClrImportant;  //number of colors that are important
 };
-typedef struct BITMAPFILEHEADER
-{
+typedef struct BITMAPFILEHEADER {
 	WORD bfType;  //specifies the file type.If the file is BMP then it must be 0x4D42 .
 	DWORD bfSize;  //specifies the size in bytes of the bitmap file
 	WORD bfReserved1;  //reserved; must be 0
@@ -35,7 +34,7 @@ typedef struct RGBTRIPLE {
 	BYTE rgbRed;
 };
 #pragma pack(pop)
-char *load_text_data(char *text_file_name) {
+char *load_text_data(char *text_file_name) {//it was strange,but the length of the resulting string is 1 more!
 	char *tmp, *R = NULL;
 	char ch;
 	int lenght = 0;
@@ -45,7 +44,7 @@ char *load_text_data(char *text_file_name) {
 			ch = fgetc(input_text);
 			tmp = (char*)realloc(R, (lenght + 1)*(sizeof(int)));
 			if (tmp == NULL) {
-				printf("Error!Not enough memory\n");
+				printf("Error! Not enough memory\n");
 				fclose(input_text);
 				free(R);
 				return NULL;
@@ -56,7 +55,7 @@ char *load_text_data(char *text_file_name) {
 				lenght++;
 			}
 		}
-		tmp = (char*)realloc(R, (lenght + 1)*(sizeof(int)));
+		tmp = (char*)realloc(R, (lenght)*(sizeof(int)));
 		if (tmp == NULL) {
 			free(R);
 			return NULL;
@@ -96,6 +95,7 @@ unsigned char *load_image_data(char *image_file_name) {
 		fseek(input_image, image_file_header.bfOffBits, SEEK_SET);
 		image_data = (unsigned char*)malloc(image_info_header.biSizeImage);
 		if (!image_data) {
+			printf("Error! Not enough memory\n");
 			free(image_data);
 			fclose(input_image);
 			return NULL;
@@ -115,14 +115,23 @@ unsigned char *load_image_data(char *image_file_name) {
 		return NULL;
 	}
 };
-void get_pixel(BITMAPINFOHEADER *image_info_header, unsigned char *image_data, RGBTRIPLE *pixel, int x, int y) {
+RGBTRIPLE *get_pixel(BITMAPINFOHEADER *image_info_header, unsigned char *image_data, int x, int y) {
+	RGBTRIPLE *pixel;
 	int padding = image_info_header->biWidth % 4;
-	int offset = sizeof(RGBTRIPLE)*x + (image_info_header->biWidth)*sizeof(RGBTRIPLE)*y+y*padding;
+	int offset = sizeof(RGBTRIPLE)*x + (image_info_header->biWidth) * sizeof(RGBTRIPLE)*y + y*padding;
 	/*printf("%d",offset);
 	printf("%c%c%c", image_data[offset], image_data[offset+1], image_data[offset+2]);*/
-	pixel->rgbtBlue = image_data[offset];
-	pixel->rgbtGreen= image_data[offset+1];
-	pixel->rgbtRed = image_data[offset+2];
+	if ((pixel = (RGBTRIPLE *)malloc(sizeof(RGBTRIPLE))) != NULL) {
+		pixel->rgbtBlue = image_data[offset];
+		pixel->rgbtGreen = image_data[offset + 1];
+		pixel->rgbtRed = image_data[offset + 2];
+		return pixel;
+	}
+	else {
+		printf("Error! Not enough memory\n");
+		free(pixel);
+		return NULL;
+	}
 };
 void bit_check(char *symbol) {/*little-endian format*/
 	int array_of_bits[8];
@@ -138,7 +147,7 @@ void bit_check(char *symbol) {/*little-endian format*/
 	}
 	printf("\n");
 };
-void put_symbol(RGBTRIPLE*pixel,char *symbol) {
+void put_symbol(RGBTRIPLE*pixel, char *symbol) {
 	int array_of_bits[8];
 	//printf("symbol for encrypt %c : ", *symbol);
 	for (int i = 0; i < 8; i++) {/*little-endian format*/
@@ -148,7 +157,7 @@ void put_symbol(RGBTRIPLE*pixel,char *symbol) {
 		else {
 			array_of_bits[i] = 1;
 		}
-	//	printf("%d", array_of_bits[i]);
+		//	printf("%d", array_of_bits[i]);
 	}
 	/*printf("\n");
 	printf("before encrypt:\n%c%c%c\n", pixel->rgbtBlue, pixel->rgbtGreen, pixel->rgbtRed);
@@ -168,19 +177,19 @@ void put_symbol(RGBTRIPLE*pixel,char *symbol) {
 		if ((k >2) && (k<6)) {
 			//printf("%d\n", k - 3);
 			if (array_of_bits[k] == 1) {
-				pixel->rgbtGreen |= (1 << k-3);
+				pixel->rgbtGreen |= (1 << k - 3);
 			}
 			else {
-				pixel->rgbtGreen &= ~(1 << k-3);
+				pixel->rgbtGreen &= ~(1 << k - 3);
 			}
 		}
 		if (k > 5) {
 			//printf("%d\n", k-6);
 			if (array_of_bits[k] == 1) {
-				pixel->rgbtRed |= (1 << k-6);
+				pixel->rgbtRed |= (1 << k - 6);
 			}
 			else {
-				pixel->rgbtRed &= ~(1 << k-6);
+				pixel->rgbtRed &= ~(1 << k - 6);
 			}
 		}
 	}
@@ -190,46 +199,7 @@ void put_symbol(RGBTRIPLE*pixel,char *symbol) {
 	bit_check(&(pixel->rgbtGreen));
 	bit_check(&(pixel->rgbtRed));*/
 };
-int encrypt(char *text_file_name, char *image_file_name) {
-	FILE *input_image, *output_image;
-	BITMAPFILEHEADER image_file_header;
-	BITMAPINFOHEADER image_info_header;
-	unsigned char *image_data;
-	char *text_data;
-	output_image = fopen(BMPIMAGENAME, "wb+");
-	if ((input_image = fopen(image_file_name, "rb")) != NULL) {
-		fread(&image_file_header, sizeof(BITMAPFILEHEADER), 1, input_image);
-		fwrite(&image_file_header, 1, sizeof(BITMAPFILEHEADER), output_image);
-		fread(&image_info_header, sizeof(BITMAPINFOHEADER), 1, input_image);
-		fwrite(&image_info_header, 1, sizeof(BITMAPINFOHEADER), output_image);
-		fclose(input_image);
-		image_data = load_image_data(image_file_name);
-		text_data = load_text_data(text_file_name);
-		int padding = (image_info_header.biWidth)%4;
-		int count_text = 0;
-		for (int y = 0; y < image_info_header.biHeight; y++) {
-			for (int x = 0; x < image_info_header.biWidth; x++) {
-				RGBTRIPLE pixel;
-				get_pixel(&image_info_header,&image_data[0],&pixel,x,y);
-				if (count_text < (strlen(text_data)-1)) {
-					put_symbol(&pixel, &text_data[count_text]);
-					count_text++;
-				}
-				fwrite(&pixel,sizeof(unsigned char),sizeof(RGBTRIPLE),output_image);
-			}
-			for (int i = 0; i < padding; i++) {
-				fwrite(SETCOLORblack, 1, 1, output_image);
-			}
-		}
-		fclose(output_image);
-	}
-	else {
-		printf("Can not open image file!\n");
-		return NULL;
-	}
-	return 1;
-};
-void get_symbol(RGBTRIPLE *pixel,unsigned char *symbol) {
+void get_symbol(RGBTRIPLE *pixel, unsigned char *symbol) {
 	int count = 0;
 	unsigned char buffer;
 	unsigned char symbol_t = 0;
@@ -280,7 +250,7 @@ int decrypt(char *text_file_name, char *image_file_name) {
 	BITMAPFILEHEADER image_file_header;
 	BITMAPINFOHEADER image_info_header;
 	unsigned char *image_data;
-	unsigned char *text_data=NULL;
+	unsigned char *text_data = NULL;
 	output_text = fopen(TXTTEXTNAME, "wb+");
 	if ((input_image = fopen(image_file_name, "rb")) != NULL) {
 		fread(&image_file_header, sizeof(BITMAPFILEHEADER), 1, input_image);
@@ -289,10 +259,10 @@ int decrypt(char *text_file_name, char *image_file_name) {
 		image_data = load_image_data(image_file_name);
 		for (int y = 0; y < image_info_header.biHeight; y++) {
 			for (int x = 0; x < image_info_header.biWidth; x++) {
-				RGBTRIPLE pixel;
+				RGBTRIPLE *pixel;
 				char *text_symbol;
-				get_pixel(&image_info_header, &image_data[0], &pixel, x, y);
-				get_symbol(&pixel,&text_symbol);
+				pixel=get_pixel(&image_info_header, &image_data[0], x, y);
+				get_symbol(pixel, &text_symbol);
 				if (text_symbol != NULL) {
 					fwrite(&text_symbol, sizeof(unsigned char), 1, output_text);
 				}
@@ -302,8 +272,58 @@ int decrypt(char *text_file_name, char *image_file_name) {
 				}
 			}
 		}
-
+		printf("File decrypted! Check the working directory!\n");
 		fclose(output_text);
+	}
+	else {
+		printf("Can not open image file!\n");
+		return NULL;
+	}
+	return 1;
+};
+int encrypt(char *text_file_name, char *image_file_name) {
+	FILE *input_image, *output_image;
+	BITMAPFILEHEADER image_file_header;
+	BITMAPINFOHEADER image_info_header;
+	unsigned char *image_data;
+	char *text_data;
+	output_image = fopen(BMPIMAGENAME, "wb+");
+	if ((input_image = fopen(image_file_name, "rb")) != NULL) {
+		fread(&image_file_header, sizeof(BITMAPFILEHEADER), 1, input_image);
+		fwrite(&image_file_header, 1, sizeof(BITMAPFILEHEADER), output_image);
+		fread(&image_info_header, sizeof(BITMAPINFOHEADER), 1, input_image);
+		fwrite(&image_info_header, 1, sizeof(BITMAPINFOHEADER), output_image);
+		fclose(input_image);
+		image_data = load_image_data(image_file_name);
+		text_data = load_text_data(text_file_name);
+		if ((image_data == NULL) || (text_data == NULL)) {
+			return NULL;
+		}
+		int padding = (image_info_header.biWidth) % 4;
+		int count_text = 0;
+		for (int y = 0; y < image_info_header.biHeight; y++) {
+			for (int x = 0; x < image_info_header.biWidth; x++) {
+				RGBTRIPLE *pixel;
+				pixel = get_pixel(&image_info_header, &image_data[0], x, y);
+				if (pixel != NULL) {
+					//printf("%c\t%c\t%c\n",pixel->rgbtBlue,pixel->rgbtGreen,pixel->rgbtRed);
+					if (count_text < (strlen(text_data) - 1)) {
+						put_symbol(pixel,&text_data[count_text]);
+						count_text++;
+					}
+					fwrite(pixel, sizeof(BYTE), sizeof(RGBTRIPLE), output_image);
+				}
+				else {
+					printf("Something was wrong...\n");
+					return NULL;
+				}
+			}
+			for (int i = 0; i < padding; i++) {
+				fwrite(SETCOLORblack, 1, 1, output_image);
+			}
+		}
+		printf("File encrypted! Check the working directory!\n");
+		fclose(output_image);
 	}
 	else {
 		printf("Can not open image file!\n");
