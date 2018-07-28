@@ -4,7 +4,7 @@
 #define BMPIMAGENAME "OUTPUT_IMAGE.bmp"
 #define TXTTEXTNAME "OUTPUT_TEXT.txt"
 #define SETCOLORblack "000"
-#define SETCOLORwhite "ˇˇˇ"
+#define SETCOLORwhite "—è—è—è"
 #include <stdio.h>
 #include <windows.h>
 #include <locale.h>
