@@ -1,9 +1,10 @@
 // LSB.c : Defines the entry point for the console application.
 //
 #define _CRT_SECURE_NO_WARNINGS
-#define BMPIMAGENAME "OUTPUT_IMAGE_NAME.bmp"
-#define TXTTEXTNAME "OUTPUT_TEXT_NAME.txt"
-#define SETCOLORblack "0"
+#define BMPIMAGENAME "OUTPUT_IMAGE.bmp"
+#define TXTTEXTNAME "OUTPUT_TEXT.txt"
+#define SETCOLORblack "000"
+#define SETCOLORwhite "ÿÿÿ"
 #include <stdio.h>
 #include <windows.h>
 #include <locale.h>
@@ -245,6 +246,16 @@ void get_symbol(RGBTRIPLE *pixel, unsigned char *symbol) {
 	*symbol = symbol_t;
 	//bit_check(&symbol_t);
 };
+int check_lsb(RGBTRIPLE *pixel) {
+	BYTE color_component;
+	color_component = pixel->rgbtRed;
+	if ((color_component & (1 << 0)) == 0) {
+		return 0;
+	}
+	else {
+		return 0;
+	}
+};
 int decrypt(char *text_file_name, char *image_file_name) {
 	FILE *input_image, *output_text;
 	BITMAPFILEHEADER image_file_header;
@@ -252,7 +263,7 @@ int decrypt(char *text_file_name, char *image_file_name) {
 	unsigned char *image_data;
 	unsigned char *text_data = NULL;
 	output_text = fopen(TXTTEXTNAME, "wb+");
-	if ((input_image = fopen(image_file_name, "rb")) != NULL) {
+	if ((input_image = fopen(image_file_name, "rb+")) != NULL) {
 		fread(&image_file_header, sizeof(BITMAPFILEHEADER), 1, input_image);
 		fread(&image_info_header, sizeof(BITMAPINFOHEADER), 1, input_image);
 		fclose(input_image);
@@ -274,12 +285,12 @@ int decrypt(char *text_file_name, char *image_file_name) {
 		}
 		printf("File decrypted! Check the working directory!\n");
 		fclose(output_text);
+		return 1;
 	}
 	else {
 		printf("Can not open image file!\n");
 		return NULL;
 	}
-	return 1;
 };
 int encrypt(char *text_file_name, char *image_file_name) {
 	FILE *input_image, *output_image;
@@ -324,21 +335,62 @@ int encrypt(char *text_file_name, char *image_file_name) {
 		}
 		printf("File encrypted! Check the working directory!\n");
 		fclose(output_image);
+		return 1;
 	}
 	else {
 		printf("Can not open image file!\n");
 		return NULL;
 	}
-	return 1;
+};
+int visual_attack(char *text_file_name, char *image_file_name) {
+	FILE *input_image, *output_image;
+	BITMAPFILEHEADER image_file_header;
+	BITMAPINFOHEADER image_info_header;
+	unsigned char *image_data;
+	output_image = fopen(BMPIMAGENAME, "wb+");
+	if ((input_image = fopen(image_file_name, "rb+")) != NULL) {
+		fread(&image_file_header, sizeof(BITMAPFILEHEADER), 1, input_image);
+		fwrite(&image_file_header, 1, sizeof(BITMAPFILEHEADER), output_image);
+		fread(&image_info_header, sizeof(BITMAPINFOHEADER), 1, input_image);
+		fwrite(&image_info_header, 1, sizeof(BITMAPINFOHEADER), output_image);
+		fclose(input_image);
+		image_data = load_image_data(image_file_name);
+		int padding = (image_info_header.biWidth) % 4;
+		for (int y = 0; y < image_info_header.biHeight; y++) {
+			for (int x = 0; x < image_info_header.biWidth; x++) {
+				RGBTRIPLE *pixel;
+				pixel = get_pixel(&image_info_header, &image_data[0], x, y);
+				if (pixel != NULL) {
+					unsigned char buffer = pixel->rgbtRed;
+					if ((buffer & (1 << 0)) == 0) fwrite(SETCOLORwhite, 1, 3, output_image);
+					else  fwrite(SETCOLORblack, 1, 3, output_image);
+				}
+				else {
+					printf("Something was wrong...\n");
+					return NULL;
+				}
+			}
+			for (int i = 0; i < padding; i++) {
+				fwrite(SETCOLORblack, 1, 1, output_image);
+			}
+		}
+		printf("Process of attack is ending! Check the working directory!\n");
+		fclose(output_image);
+		return 1;
+	}
+	else {
+		printf("Can not open image file!\n");
+		return NULL;
+	}
 };
 int main(int argc, char **argv)
 {
 	setlocale(LC_ALL, "Russian");
 	if (argc == 4) {
-		char *keys[3] = { "-e","-d" };
+		char *keys[4] = { "-encrypt","-decrypt","-analyze","-visual_attack"};
 		int is_key = 0;
 		int(*lsb)(char *arg1, char *arg2);
-		for (int i = 0; i < 2; i++) {
+		for (int i = 0; i < 4; i++) {
 			if (strcmp(keys[i], argv[3]) == 0) {
 				switch (i)
 				{
@@ -350,6 +402,16 @@ int main(int argc, char **argv)
 				case 1:
 					is_key = 1;
 					lsb = decrypt;
+					if (lsb(argv[1], argv[2]) == NULL) printf("Problem with FILE or low of memory!\n");
+					break;
+				case 2:
+					is_key = 1;
+					//lsb = analyze;
+					if (lsb(argv[1], argv[2]) == NULL) printf("Problem with FILE or low of memory!\n");
+					break;
+				case 3:
+					is_key = 1;
+					lsb = visual_attack;
 					if (lsb(argv[1], argv[2]) == NULL) printf("Problem with FILE or low of memory!\n");
 					break;
 				default:
